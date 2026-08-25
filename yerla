@@ -1,0 +1,1165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gram Panchayat Attendance Management</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          brand: { 50:"#eef7f2",100:"#d9eee3",200:"#b7ddc8",500:"#22a05a",600:"#15803d",700:"#166534",800:"#14532d",900:"#0f3d21" }
+        },
+        fontFamily: { devanagari: ["Noto Sans Devanagari","system-ui","sans-serif"] }
+      }
+    }
+  }
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  body { font-family: "Noto Sans Devanagari", ui-sans-serif, system-ui, sans-serif; }
+  @media print {
+    body * { visibility: hidden; }
+    #printArea, #printArea * { visibility: visible; }
+    #printArea { position: absolute; left: 0; top: 0; width: 100%; }
+    .no-print { display: none !important; }
+  }
+  #loadingScreen { transition: opacity .3s ease; }
+</style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+
+<!-- LOADING SCREEN -->
+<div id="loadingScreen" class="fixed inset-0 z-[200] bg-white flex flex-col items-center justify-center gap-4">
+  <div class="w-14 h-14 rounded-2xl bg-green-700 text-white grid place-items-center font-black text-xl animate-pulse">GP</div>
+  <p id="loadingText" class="text-slate-500 text-sm font-semibold">Loading...</p>
+</div>
+
+<!-- ========================================================= -->
+<!-- LOGIN PAGE -->
+<!-- ========================================================= -->
+<section id="loginPage" class="hidden min-h-screen flex items-center justify-center p-6 bg-gradient-to-br from-green-50 via-white to-emerald-100">
+  <div class="w-full max-w-md">
+
+    <div class="flex justify-end mb-3">
+      <select id="langSwitcherLogin" onchange="setLanguage(this.value)" class="text-sm font-semibold px-3 py-2 rounded-xl border border-slate-200 bg-white shadow-sm outline-none focus:ring-2 focus:ring-green-500">
+        <option value="en">English</option>
+        <option value="hi">हिंदी</option>
+        <option value="mr">मराठी</option>
+      </select>
+    </div>
+
+    <div class="text-center mb-8">
+      <div class="mx-auto w-20 h-20 rounded-3xl bg-green-700 text-white flex items-center justify-center text-3xl font-black shadow-xl">GP</div>
+      <h1 class="text-3xl font-black mt-5 text-slate-800" data-i18n="appName">Gram Panchayat</h1>
+      <p class="text-slate-500 mt-1" data-i18n="appTagline">Digital Attendance Management</p>
+    </div>
+
+    <div class="bg-white rounded-3xl shadow-2xl border border-slate-100 p-8">
+      <div class="mb-6">
+        <h2 class="text-2xl font-bold" data-i18n="loginHeading">Staff Login</h2>
+        <p class="text-sm text-slate-500 mt-1" data-i18n="loginSub">Login to manage staff attendance</p>
+      </div>
+
+      <form onsubmit="event.preventDefault(); login();">
+        <label class="text-sm font-semibold" data-i18n="usernameLabel">Username</label>
+        <input id="username" type="text" value="admin" data-i18n-placeholder="usernamePlaceholder" placeholder="Enter username"
+          class="w-full mt-2 mb-5 px-4 py-3.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition">
+
+        <label class="text-sm font-semibold" data-i18n="passwordLabel">Password</label>
+        <div class="relative">
+          <input id="password" type="password" value="admin123" data-i18n-placeholder="passwordPlaceholder" placeholder="Enter password"
+            class="w-full mt-2 px-4 py-3.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition pr-12">
+          <button type="button" onclick="togglePassword()" class="absolute right-3 top-5 text-slate-400 hover:text-green-700">👁</button>
+        </div>
+
+        <button type="submit" class="w-full mt-6 py-3.5 rounded-xl bg-green-700 hover:bg-green-800 active:scale-[.98] text-white font-bold transition shadow-lg shadow-green-700/20" data-i18n="loginBtn">Login</button>
+      </form>
+
+      <div class="mt-5 p-3 rounded-xl bg-green-50 border border-green-100 text-center">
+        <p class="text-xs text-green-700"><span data-i18n="demoLoginNote">Demo Login:</span> <b>admin</b> / <b>admin123</b></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ========================================================= -->
+<!-- MAIN APP -->
+<!-- ========================================================= -->
+<div id="app" class="hidden min-h-screen">
+
+  <aside class="fixed inset-y-0 left-0 z-40 w-64 bg-white border-r border-slate-200 hidden lg:flex flex-col">
+    <div class="p-6 border-b">
+      <div class="flex items-center gap-3">
+        <div class="w-11 h-11 rounded-xl bg-green-700 text-white flex items-center justify-center font-black">GP</div>
+        <div>
+          <div class="font-black" data-i18n="appName">Gram Panchayat</div>
+          <div class="text-xs text-slate-500" data-i18n="appSystemLabel">Attendance System</div>
+        </div>
+      </div>
+    </div>
+
+    <nav class="p-4 space-y-2 flex-1">
+      <button onclick="showPage('dashboard')" data-page="dashboard" class="navBtn active w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left font-semibold">📊 <span data-i18n="navDashboard">Dashboard</span></button>
+      <button onclick="showPage('employees')" data-page="employees" class="navBtn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left font-semibold">👥 <span data-i18n="navEmployees">Employees</span></button>
+      <button onclick="showPage('attendance')" data-page="attendance" class="navBtn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left font-semibold">📝 <span data-i18n="navAttendance">Attendance</span></button>
+      <button onclick="showPage('reports')" data-page="reports" class="navBtn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left font-semibold">📈 <span data-i18n="navReports">Reports</span></button>
+    </nav>
+
+    <div class="p-4 border-t space-y-3">
+      <select id="langSwitcherSidebar" onchange="setLanguage(this.value)" class="w-full text-sm font-semibold px-3 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-green-500">
+        <option value="en">English</option>
+        <option value="hi">हिंदी</option>
+        <option value="mr">मराठी</option>
+      </select>
+      <button onclick="logout()" class="w-full py-3 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 font-semibold transition">🚪 <span data-i18n="logout">Logout</span></button>
+    </div>
+  </aside>
+
+  <div id="mobileOverlay" onclick="closeMobileMenu()" class="hidden fixed inset-0 bg-black/40 z-30 lg:hidden"></div>
+
+  <aside id="mobileSidebar" class="fixed inset-y-0 left-0 z-40 w-72 bg-white shadow-2xl -translate-x-full transition-transform lg:hidden">
+    <div class="p-5 border-b flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-green-700 text-white grid place-items-center font-bold">GP</div>
+        <div>
+          <p class="font-bold" data-i18n="appName">Gram Panchayat</p>
+          <p class="text-xs text-slate-500" data-i18n="appTagline">Attendance</p>
+        </div>
+      </div>
+      <button onclick="closeMobileMenu()" class="text-xl">✕</button>
+    </div>
+    <nav class="p-4 space-y-2">
+      <button onclick="mobileNavigate('dashboard')" class="w-full text-left px-4 py-3 rounded-xl hover:bg-green-50">📊 <span data-i18n="navDashboard">Dashboard</span></button>
+      <button onclick="mobileNavigate('employees')" class="w-full text-left px-4 py-3 rounded-xl hover:bg-green-50">👥 <span data-i18n="navEmployees">Employees</span></button>
+      <button onclick="mobileNavigate('attendance')" class="w-full text-left px-4 py-3 rounded-xl hover:bg-green-50">📝 <span data-i18n="navAttendance">Attendance</span></button>
+      <button onclick="mobileNavigate('reports')" class="w-full text-left px-4 py-3 rounded-xl hover:bg-green-50">📈 <span data-i18n="navReports">Reports</span></button>
+      <div class="pt-2">
+        <select id="langSwitcherMobile" onchange="setLanguage(this.value)" class="w-full text-sm font-semibold px-3 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-green-500">
+          <option value="en">English</option>
+          <option value="hi">हिंदी</option>
+          <option value="mr">मराठी</option>
+        </select>
+      </div>
+      <button onclick="logout()" class="w-full text-left px-4 py-3 rounded-xl text-red-600 hover:bg-red-50">🚪 <span data-i18n="logout">Logout</span></button>
+    </nav>
+  </aside>
+
+  <main class="lg:ml-64">
+    <header class="sticky top-0 z-20 bg-white/90 backdrop-blur border-b border-slate-200 px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <button onclick="openMobileMenu()" class="lg:hidden w-10 h-10 rounded-xl bg-slate-100 hover:bg-green-50">☰</button>
+        <div>
+          <h2 id="pageTitle" class="font-black text-lg" data-i18n="navDashboard">Dashboard</h2>
+          <p id="currentDate" class="text-xs text-slate-500"></p>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <div class="hidden sm:block text-right">
+          <p class="text-sm font-semibold" data-i18n="adminStaff">Admin Staff</p>
+          <p class="text-xs text-slate-500" data-i18n="administrator">Administrator</p>
+        </div>
+        <div class="w-10 h-10 rounded-full bg-green-100 text-green-700 grid place-items-center font-bold">A</div>
+      </div>
+    </header>
+
+    <div class="p-4 sm:p-6 lg:p-8">
+
+      <!-- DASHBOARD -->
+      <section id="dashboard" class="page">
+        <div class="mb-7">
+          <h1 class="text-2xl sm:text-3xl font-black"><span data-i18n="goodMorning">Good Morning, Admin</span> 👋</h1>
+          <p class="text-slate-500 mt-1" data-i18n="dashboardSub">Here's today's attendance overview.</p>
+        </div>
+
+        <div class="grid sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-7">
+          <div class="bg-white p-5 rounded-2xl border shadow-sm">
+            <div class="flex justify-between items-start">
+              <div><p class="text-sm text-slate-500" data-i18n="statTotalEmployees">Total Employees</p><p id="totalEmployees" class="text-3xl font-black mt-2">0</p></div>
+              <div class="w-11 h-11 rounded-xl bg-blue-50 text-blue-600 grid place-items-center">👥</div>
+            </div>
+          </div>
+          <div class="bg-white p-5 rounded-2xl border shadow-sm">
+            <div class="flex justify-between items-start">
+              <div><p class="text-sm text-slate-500" data-i18n="statPresentToday">Present Today</p><p id="presentCount" class="text-3xl font-black text-green-700 mt-2">0</p></div>
+              <div class="w-11 h-11 rounded-xl bg-green-50 text-green-600 grid place-items-center">✓</div>
+            </div>
+          </div>
+          <div class="bg-white p-5 rounded-2xl border shadow-sm">
+            <div class="flex justify-between items-start">
+              <div><p class="text-sm text-slate-500" data-i18n="statAbsentToday">Absent Today</p><p id="absentCount" class="text-3xl font-black text-red-600 mt-2">0</p></div>
+              <div class="w-11 h-11 rounded-xl bg-red-50 text-red-600 grid place-items-center">✕</div>
+            </div>
+          </div>
+          <div class="bg-white p-5 rounded-2xl border shadow-sm">
+            <div class="flex justify-between items-start">
+              <div><p class="text-sm text-slate-500" data-i18n="statOnLeave">On Leave</p><p id="leaveCount" class="text-3xl font-black text-amber-600 mt-2">0</p></div>
+              <div class="w-11 h-11 rounded-xl bg-amber-50 text-amber-600 grid place-items-center">🗓</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-2xl border shadow-sm">
+          <div class="p-5 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 class="font-black text-lg" data-i18n="todaysAttendance">Today's Attendance</h3>
+              <p class="text-sm text-slate-500" data-i18n="todaysAttendanceSub">Current attendance status</p>
+            </div>
+            <button onclick="showPage('attendance')" class="px-4 py-2.5 rounded-xl bg-green-700 hover:bg-green-800 text-white text-sm font-semibold"><span data-i18n="markAttendanceBtn">Mark Attendance</span> →</button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead><tr class="text-left text-slate-500 bg-slate-50 border-b">
+                <th class="p-4" data-i18n="tableEmployee">Employee</th><th data-i18n="tableDepartment">Department</th><th data-i18n="tableRole">Role</th><th data-i18n="tableStatus">Status</th>
+              </tr></thead>
+              <tbody id="dashTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+
+      <!-- EMPLOYEES -->
+      <section id="employees" class="page hidden">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+          <div>
+            <h1 class="text-2xl sm:text-3xl font-black" data-i18n="employeeMgmtTitle">Employee Management</h1>
+            <p class="text-slate-500 mt-1" data-i18n="employeeMgmtSub">Add, edit and manage Gram Panchayat staff.</p>
+          </div>
+          <button onclick="openEmployeeModal()" class="px-5 py-3 bg-green-700 hover:bg-green-800 text-white rounded-xl font-bold shadow-lg shadow-green-700/20">+ <span data-i18n="addEmployeeBtn">Add Employee</span></button>
+        </div>
+
+        <div class="bg-white rounded-2xl border shadow-sm overflow-hidden">
+          <div class="p-4 border-b flex flex-col md:flex-row gap-3">
+            <div class="relative flex-1">
+              <input id="employeeSearch" oninput="renderEmployees()" data-i18n-placeholder="searchPlaceholder"
+                class="w-full px-4 py-3 pl-10 border rounded-xl outline-none focus:ring-2 focus:ring-green-500" placeholder="Search employee, department or role...">
+              <span class="absolute left-3 top-3.5 text-slate-400">🔍</span>
+            </div>
+            <select id="employeeDepartmentFilter" onchange="renderEmployees()" class="deptSelect px-4 py-3 border rounded-xl outline-none focus:ring-2 focus:ring-green-500"></select>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead><tr class="text-left bg-slate-50 text-slate-500 border-b">
+                <th class="p-4" data-i18n="tableEmployee">Employee</th><th data-i18n="tableDepartment">Department</th><th data-i18n="tableRole">Role</th><th data-i18n="tableContact">Contact</th><th data-i18n="tableStatus">Status</th><th class="pr-4" data-i18n="tableAction">Action</th>
+              </tr></thead>
+              <tbody id="employeeTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+
+      <!-- ATTENDANCE -->
+      <section id="attendance" class="page hidden">
+        <div class="mb-6">
+          <h1 class="text-2xl sm:text-3xl font-black" data-i18n="markAttendanceTitle">Mark Attendance</h1>
+          <p class="text-slate-500 mt-1" data-i18n="markAttendanceSub">Record daily employee attendance.</p>
+        </div>
+
+        <div class="bg-white rounded-2xl border shadow-sm p-5">
+          <div class="grid md:grid-cols-3 gap-4 mb-6">
+            <div>
+              <label class="text-sm font-semibold" data-i18n="attendanceDateLabel">Attendance Date</label>
+              <input id="attDate" type="date" onchange="renderAttendance()" class="w-full mt-2 px-4 py-3 border rounded-xl outline-none focus:ring-2 focus:ring-green-500">
+            </div>
+            <div>
+              <label class="text-sm font-semibold" data-i18n="departmentLabel">Department</label>
+              <select id="attendanceDepartment" onchange="renderAttendance()" class="deptSelect w-full mt-2 px-4 py-3 border rounded-xl outline-none focus:ring-2 focus:ring-green-500"></select>
+            </div>
+            <div>
+              <label class="text-sm font-semibold" data-i18n="quickActionLabel">Quick Action</label>
+              <button onclick="markAllPresent()" class="w-full mt-2 px-4 py-3 border border-green-200 text-green-700 hover:bg-green-50 rounded-xl font-semibold">✓ <span data-i18n="markAllPresentBtn">Mark All Present</span></button>
+            </div>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead><tr class="border-b text-left text-slate-500 bg-slate-50">
+                <th class="p-4" data-i18n="tableEmployee">Employee</th><th data-i18n="tableDepartment">Department</th><th data-i18n="tableRole">Role</th><th data-i18n="tableStatus">Status</th>
+              </tr></thead>
+              <tbody id="attendanceTable"></tbody>
+            </table>
+          </div>
+
+          <div class="mt-6 flex flex-col sm:flex-row justify-between gap-3">
+            <div id="attendanceSummary" class="text-sm text-slate-500"></div>
+            <button onclick="saveAttendance()" class="px-6 py-3 bg-green-700 hover:bg-green-800 text-white rounded-xl font-bold" data-i18n="saveAttendanceBtn">Save Attendance</button>
+          </div>
+        </div>
+      </section>
+
+
+      <!-- REPORTS -->
+      <section id="reports" class="page hidden">
+        <div class="mb-6">
+          <h1 class="text-2xl sm:text-3xl font-black" data-i18n="reportsTitle">Attendance Reports</h1>
+          <p class="text-slate-500 mt-1" data-i18n="reportsSub">View monthly attendance performance.</p>
+        </div>
+
+        <div class="grid sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+          <div class="bg-white p-5 rounded-2xl border"><p class="text-sm text-slate-500" data-i18n="attendanceRate">Attendance Rate</p><p id="reportRate" class="text-3xl font-black text-green-700 mt-1">0%</p></div>
+          <div class="bg-white p-5 rounded-2xl border"><p class="text-sm text-slate-500" data-i18n="workingDaysLabel">Working Days</p><p id="workingDays" class="text-3xl font-black mt-1">0</p></div>
+          <div class="bg-white p-5 rounded-2xl border"><p class="text-sm text-slate-500" data-i18n="totalRecordsLabel">Total Records</p><p id="recordCount" class="text-3xl font-black mt-1">0</p></div>
+          <div class="bg-white p-5 rounded-2xl border"><p class="text-sm text-slate-500" data-i18n="presentRecordsLabel">Present Records</p><p id="reportPresent" class="text-3xl font-black text-green-700 mt-1">0</p></div>
+        </div>
+
+        <div id="printArea" class="bg-white rounded-2xl border shadow-sm p-5">
+          <div class="flex flex-col lg:flex-row gap-3 justify-between mb-5 no-print">
+            <div class="flex flex-col sm:flex-row gap-3">
+              <input id="reportMonth" type="month" onchange="renderReports()" class="px-4 py-2.5 border rounded-xl">
+              <select id="reportEmployee" onchange="renderReports()" class="px-4 py-2.5 border rounded-xl"><option value="" data-i18n="allEmployees">All Employees</option></select>
+            </div>
+            <div class="flex gap-2">
+              <button onclick="exportCSV()" class="px-4 py-2.5 border rounded-xl font-semibold hover:bg-slate-50">⬇ <span data-i18n="exportCSVBtn">Export CSV</span></button>
+              <button onclick="window.print()" class="px-4 py-2.5 bg-green-700 text-white rounded-xl font-semibold hover:bg-green-800">🖨 <span data-i18n="printBtn">Print</span></button>
+            </div>
+          </div>
+
+          <div class="mb-5">
+            <h2 class="text-xl font-black" data-i18n="monthlyReportTitle">Monthly Employee Attendance</h2>
+            <p id="reportSubtitle" class="text-sm text-slate-500"></p>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead><tr class="bg-slate-50 text-left text-slate-500 border-b">
+                <th class="p-4" data-i18n="tableEmployee">Employee</th><th data-i18n="tableDepartment">Department</th><th data-i18n="reportTablePresent">Present</th><th data-i18n="reportTableAbsent">Absent</th><th data-i18n="reportTableLeave">Leave</th><th data-i18n="reportTablePercentage">Attendance %</th>
+              </tr></thead>
+              <tbody id="reportTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+</div>
+
+
+<!-- EMPLOYEE MODAL -->
+<div id="employeeModal" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm items-center justify-center p-4">
+  <div class="bg-white w-full max-w-lg rounded-3xl shadow-2xl">
+    <div class="p-6 border-b flex justify-between items-center">
+      <div>
+        <h2 id="modalTitle" class="text-xl font-black" data-i18n="modalAddTitle">Add Employee</h2>
+        <p class="text-sm text-slate-500" data-i18n="modalSub">Enter employee details</p>
+      </div>
+      <button onclick="closeEmployeeModal()" class="w-9 h-9 rounded-xl bg-slate-100 hover:bg-red-50 hover:text-red-600">✕</button>
+    </div>
+
+    <form onsubmit="event.preventDefault(); saveEmployee()" class="p-6">
+      <input type="hidden" id="employeeId">
+      <div class="grid sm:grid-cols-2 gap-4">
+        <div class="sm:col-span-2">
+          <label class="text-sm font-semibold" data-i18n="fullNameLabel">Full Name *</label>
+          <input id="employeeName" required data-i18n-placeholder="fullNamePlaceholder" class="w-full mt-2 px-4 py-3 border rounded-xl focus:ring-2 focus:ring-green-500 outline-none" placeholder="Enter full name">
+        </div>
+        <div>
+          <label class="text-sm font-semibold" data-i18n="departmentRequiredLabel">Department *</label>
+          <select id="employeeDept" required class="deptSelectForm w-full mt-2 px-4 py-3 border rounded-xl focus:ring-2 focus:ring-green-500 outline-none"></select>
+        </div>
+        <div>
+          <label class="text-sm font-semibold" data-i18n="roleRequiredLabel">Role *</label>
+          <input id="employeeRole" required data-i18n-placeholder="rolePlaceholder" class="w-full mt-2 px-4 py-3 border rounded-xl focus:ring-2 focus:ring-green-500 outline-none" placeholder="e.g. Clerk">
+        </div>
+        <div class="sm:col-span-2">
+          <label class="text-sm font-semibold" data-i18n="phoneRequiredLabel">Phone *</label>
+          <input id="employeePhone" required data-i18n-placeholder="phonePlaceholder" class="w-full mt-2 px-4 py-3 border rounded-xl focus:ring-2 focus:ring-green-500 outline-none" placeholder="98765 43210">
+        </div>
+      </div>
+      <div class="flex justify-end gap-3 mt-7">
+        <button type="button" onclick="closeEmployeeModal()" class="px-5 py-3 rounded-xl border font-semibold" data-i18n="cancelBtn">Cancel</button>
+        <button type="submit" class="px-6 py-3 rounded-xl bg-green-700 hover:bg-green-800 text-white font-bold" data-i18n="saveEmployeeBtn">Save Employee</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+
+<!-- DELETE MODAL -->
+<div id="deleteModal" class="hidden fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm items-center justify-center p-4">
+  <div class="bg-white w-full max-w-sm rounded-3xl shadow-2xl p-7 text-center">
+    <div class="w-14 h-14 mx-auto rounded-full bg-red-100 text-red-600 grid place-items-center text-xl">⚠</div>
+    <h2 class="text-xl font-black mt-4" data-i18n="deleteConfirmTitle">Delete Employee?</h2>
+    <p class="text-sm text-slate-500 mt-2" data-i18n="deleteConfirmSub">This employee and their attendance records will be removed.</p>
+    <div class="flex gap-3 mt-6">
+      <button onclick="closeDeleteModal()" class="flex-1 py-3 rounded-xl border font-semibold" data-i18n="cancelBtn">Cancel</button>
+      <button onclick="confirmDelete()" class="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold" data-i18n="deleteBtnConfirm">Delete</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- TOAST -->
+<div id="toast" class="fixed bottom-5 right-5 z-[100] translate-y-20 opacity-0 transition-all duration-300">
+  <div id="toastContent" class="bg-slate-900 text-white px-5 py-3 rounded-xl shadow-xl text-sm font-semibold"></div>
+</div>
+
+
+<script>
+/* =========================================================
+   TRANSLATIONS
+========================================================= */
+const translations = {
+  en: {
+    appName: "Gram Panchayat", appTagline: "Digital Attendance Management", appSystemLabel: "Attendance System",
+    loginHeading: "Staff Login", loginSub: "Login to manage staff attendance",
+    usernameLabel: "Username", usernamePlaceholder: "Enter username",
+    passwordLabel: "Password", passwordPlaceholder: "Enter password",
+    loginBtn: "Login", demoLoginNote: "Demo Login:",
+    navDashboard: "Dashboard", navEmployees: "Employees", navAttendance: "Attendance", navReports: "Reports", logout: "Logout",
+    adminStaff: "Admin Staff", administrator: "Administrator",
+    goodMorning: "Good Morning, Admin", dashboardSub: "Here's today's attendance overview.",
+    statTotalEmployees: "Total Employees", statPresentToday: "Present Today", statAbsentToday: "Absent Today", statOnLeave: "On Leave",
+    todaysAttendance: "Today's Attendance", todaysAttendanceSub: "Current attendance status", markAttendanceBtn: "Mark Attendance",
+    tableEmployee: "Employee", tableDepartment: "Department", tableRole: "Role", tableStatus: "Status", tableContact: "Contact", tableAction: "Action",
+    employeeMgmtTitle: "Employee Management", employeeMgmtSub: "Add, edit and manage Gram Panchayat staff.", addEmployeeBtn: "Add Employee",
+    searchPlaceholder: "Search employee, department or role...", allDepartments: "All Departments",
+    deptAdministration: "Administration", deptAccounts: "Accounts", deptDevelopment: "Development",
+    noEmployeesFound: "No employees found.", editBtn: "Edit", deleteBtn: "Delete",
+    modalAddTitle: "Add Employee", modalEditTitle: "Edit Employee", modalSub: "Enter employee details",
+    fullNameLabel: "Full Name *", fullNamePlaceholder: "Enter full name",
+    departmentLabel: "Department", departmentRequiredLabel: "Department *", selectDepartment: "Select Department",
+    roleRequiredLabel: "Role *", rolePlaceholder: "e.g. Clerk",
+    phoneRequiredLabel: "Phone *", phonePlaceholder: "98765 43210",
+    cancelBtn: "Cancel", saveEmployeeBtn: "Save Employee",
+    deleteConfirmTitle: "Delete Employee?", deleteConfirmSub: "This employee and their attendance records will be removed.", deleteBtnConfirm: "Delete",
+    markAttendanceTitle: "Mark Attendance", markAttendanceSub: "Record daily employee attendance.",
+    attendanceDateLabel: "Attendance Date", quickActionLabel: "Quick Action", markAllPresentBtn: "Mark All Present",
+    saveAttendanceBtn: "Save Attendance",
+    present: "Present", absent: "Absent", leave: "Leave",
+    summaryPresent: "Present", summaryAbsent: "Absent", summaryLeave: "Leave",
+    reportsTitle: "Attendance Reports", reportsSub: "View monthly attendance performance.",
+    attendanceRate: "Attendance Rate", workingDaysLabel: "Working Days", totalRecordsLabel: "Total Records", presentRecordsLabel: "Present Records",
+    allEmployees: "All Employees", exportCSVBtn: "Export CSV", printBtn: "Print", monthlyReportTitle: "Monthly Employee Attendance",
+    reportTablePresent: "Present", reportTableAbsent: "Absent", reportTableLeave: "Leave", reportTablePercentage: "Attendance %",
+    noReportData: "No report data available.",
+    idPrefix: "ID",
+    toastLoginSuccess: "Login successful!", toastInvalidLogin: "Invalid username or password!",
+    toastFieldsRequired: "Please fill all fields.", toastEmployeeUpdated: "Employee updated successfully!",
+    toastEmployeeAdded: "Employee added successfully!", toastEmployeeDeleted: "Employee deleted successfully!",
+    toastAllMarkedPresent: "All employees marked Present.", toastAttendanceSaved: "Attendance saved successfully!",
+    toastCSVExported: "CSV exported successfully!", toastLoadError: "Could not load saved data. Starting fresh.",
+    dateLocale: "en-IN"
+  },
+  hi: {
+    appName: "ग्राम पंचायत", appTagline: "डिजिटल उपस्थिति प्रबंधन", appSystemLabel: "उपस्थिति प्रणाली",
+    loginHeading: "स्टाफ लॉगिन", loginSub: "स्टाफ की उपस्थिति प्रबंधित करने के लिए लॉगिन करें",
+    usernameLabel: "उपयोगकर्ता नाम", usernamePlaceholder: "उपयोगकर्ता नाम दर्ज करें",
+    passwordLabel: "पासवर्ड", passwordPlaceholder: "पासवर्ड दर्ज करें",
+    loginBtn: "लॉगिन करें", demoLoginNote: "डेमो लॉगिन:",
+    navDashboard: "डैशबोर्ड", navEmployees: "कर्मचारी", navAttendance: "उपस्थिति", navReports: "रिपोर्ट", logout: "लॉगआउट",
+    adminStaff: "एडमिन स्टाफ", administrator: "प्रशासक",
+    goodMorning: "सुप्रभात, एडमिन", dashboardSub: "आज की उपस्थिति का सारांश यहाँ है।",
+    statTotalEmployees: "कुल कर्मचारी", statPresentToday: "आज उपस्थित", statAbsentToday: "आज अनुपस्थित", statOnLeave: "छुट्टी पर",
+    todaysAttendance: "आज की उपस्थिति", todaysAttendanceSub: "वर्तमान उपस्थिति स्थिति", markAttendanceBtn: "उपस्थिति दर्ज करें",
+    tableEmployee: "कर्मचारी", tableDepartment: "विभाग", tableRole: "पद", tableStatus: "स्थिति", tableContact: "संपर्क", tableAction: "कार्रवाई",
+    employeeMgmtTitle: "कर्मचारी प्रबंधन", employeeMgmtSub: "ग्राम पंचायत स्टाफ जोड़ें, संपादित करें और प्रबंधित करें।", addEmployeeBtn: "कर्मचारी जोड़ें",
+    searchPlaceholder: "कर्मचारी, विभाग या पद खोजें...", allDepartments: "सभी विभाग",
+    deptAdministration: "प्रशासन", deptAccounts: "लेखा", deptDevelopment: "विकास",
+    noEmployeesFound: "कोई कर्मचारी नहीं मिला।", editBtn: "संपादित करें", deleteBtn: "हटाएं",
+    modalAddTitle: "कर्मचारी जोड़ें", modalEditTitle: "कर्मचारी संपादित करें", modalSub: "कर्मचारी का विवरण दर्ज करें",
+    fullNameLabel: "पूरा नाम *", fullNamePlaceholder: "पूरा नाम दर्ज करें",
+    departmentLabel: "विभाग", departmentRequiredLabel: "विभाग *", selectDepartment: "विभाग चुनें",
+    roleRequiredLabel: "पद *", rolePlaceholder: "जैसे क्लर्क",
+    phoneRequiredLabel: "फ़ोन *", phonePlaceholder: "98765 43210",
+    cancelBtn: "रद्द करें", saveEmployeeBtn: "कर्मचारी सहेजें",
+    deleteConfirmTitle: "कर्मचारी हटाएं?", deleteConfirmSub: "यह कर्मचारी और उसके उपस्थिति रिकॉर्ड हटा दिए जाएंगे।", deleteBtnConfirm: "हटाएं",
+    markAttendanceTitle: "उपस्थिति दर्ज करें", markAttendanceSub: "दैनिक कर्मचारी उपस्थिति रिकॉर्ड करें।",
+    attendanceDateLabel: "उपस्थिति तिथि", quickActionLabel: "त्वरित कार्रवाई", markAllPresentBtn: "सभी को उपस्थित करें",
+    saveAttendanceBtn: "उपस्थिति सहेजें",
+    present: "उपस्थित", absent: "अनुपस्थित", leave: "छुट्टी",
+    summaryPresent: "उपस्थित", summaryAbsent: "अनुपस्थित", summaryLeave: "छुट्टी",
+    reportsTitle: "उपस्थिति रिपोर्ट", reportsSub: "मासिक उपस्थिति प्रदर्शन देखें।",
+    attendanceRate: "उपस्थिति दर", workingDaysLabel: "कार्य दिवस", totalRecordsLabel: "कुल रिकॉर्ड", presentRecordsLabel: "उपस्थिति रिकॉर्ड",
+    allEmployees: "सभी कर्मचारी", exportCSVBtn: "CSV निर्यात करें", printBtn: "प्रिंट करें", monthlyReportTitle: "मासिक कर्मचारी उपस्थिति",
+    reportTablePresent: "उपस्थित", reportTableAbsent: "अनुपस्थित", reportTableLeave: "छुट्टी", reportTablePercentage: "उपस्थिति %",
+    noReportData: "कोई रिपोर्ट डेटा उपलब्ध नहीं है।",
+    idPrefix: "आईडी",
+    toastLoginSuccess: "लॉगिन सफल!", toastInvalidLogin: "अमान्य उपयोगकर्ता नाम या पासवर्ड!",
+    toastFieldsRequired: "कृपया सभी फ़ील्ड भरें।", toastEmployeeUpdated: "कर्मचारी सफलतापूर्वक अपडेट हुआ!",
+    toastEmployeeAdded: "कर्मचारी सफलतापूर्वक जोड़ा गया!", toastEmployeeDeleted: "कर्मचारी सफलतापूर्वक हटाया गया!",
+    toastAllMarkedPresent: "सभी कर्मचारी उपस्थित दर्ज किए गए।", toastAttendanceSaved: "उपस्थिति सफलतापूर्वक सहेजी गई!",
+    toastCSVExported: "CSV सफलतापूर्वक निर्यात हुई!", toastLoadError: "सहेजा गया डेटा लोड नहीं हो सका। नए सिरे से शुरू कर रहे हैं।",
+    dateLocale: "hi-IN"
+  },
+  mr: {
+    appName: "ग्रामपंचायत", appTagline: "डिजिटल हजेरी व्यवस्थापन", appSystemLabel: "हजेरी प्रणाली",
+    loginHeading: "कर्मचारी लॉगिन", loginSub: "कर्मचाऱ्यांची हजेरी व्यवस्थापित करण्यासाठी लॉगिन करा",
+    usernameLabel: "वापरकर्तानाव", usernamePlaceholder: "वापरकर्तानाव टाका",
+    passwordLabel: "पासवर्ड", passwordPlaceholder: "पासवर्ड टाका",
+    loginBtn: "लॉगिन करा", demoLoginNote: "डेमो लॉगिन:",
+    navDashboard: "डॅशबोर्ड", navEmployees: "कर्मचारी", navAttendance: "हजेरी", navReports: "अहवाल", logout: "लॉगआउट",
+    adminStaff: "प्रशासक स्टाफ", administrator: "प्रशासक",
+    goodMorning: "सुप्रभात, प्रशासक", dashboardSub: "आजच्या हजेरीचा आढावा येथे आहे.",
+    statTotalEmployees: "एकूण कर्मचारी", statPresentToday: "आज हजर", statAbsentToday: "आज गैरहजर", statOnLeave: "रजेवर",
+    todaysAttendance: "आजची हजेरी", todaysAttendanceSub: "सद्य हजेरी स्थिती", markAttendanceBtn: "हजेरी नोंदवा",
+    tableEmployee: "कर्मचारी", tableDepartment: "विभाग", tableRole: "पद", tableStatus: "स्थिती", tableContact: "संपर्क", tableAction: "कृती",
+    employeeMgmtTitle: "कर्मचारी व्यवस्थापन", employeeMgmtSub: "ग्रामपंचायत स्टाफ जोडा, संपादित करा आणि व्यवस्थापित करा.", addEmployeeBtn: "कर्मचारी जोडा",
+    searchPlaceholder: "कर्मचारी, विभाग किंवा पद शोधा...", allDepartments: "सर्व विभाग",
+    deptAdministration: "प्रशासन", deptAccounts: "लेखा", deptDevelopment: "विकास",
+    noEmployeesFound: "कोणताही कर्मचारी सापडला नाही.", editBtn: "संपादित करा", deleteBtn: "काढा",
+    modalAddTitle: "कर्मचारी जोडा", modalEditTitle: "कर्मचारी संपादित करा", modalSub: "कर्मचाऱ्याचा तपशील टाका",
+    fullNameLabel: "पूर्ण नाव *", fullNamePlaceholder: "पूर्ण नाव टाका",
+    departmentLabel: "विभाग", departmentRequiredLabel: "विभाग *", selectDepartment: "विभाग निवडा",
+    roleRequiredLabel: "पद *", rolePlaceholder: "उदा. क्लार्क",
+    phoneRequiredLabel: "फोन *", phonePlaceholder: "98765 43210",
+    cancelBtn: "रद्द करा", saveEmployeeBtn: "कर्मचारी जतन करा",
+    deleteConfirmTitle: "कर्मचारी काढायचा?", deleteConfirmSub: "हा कर्मचारी आणि त्याचे हजेरी रेकॉर्ड काढले जातील.", deleteBtnConfirm: "काढा",
+    markAttendanceTitle: "हजेरी नोंदवा", markAttendanceSub: "दैनंदिन कर्मचारी हजेरी नोंदवा.",
+    attendanceDateLabel: "हजेरी तारीख", quickActionLabel: "त्वरित कृती", markAllPresentBtn: "सर्वांना हजर करा",
+    saveAttendanceBtn: "हजेरी जतन करा",
+    present: "हजर", absent: "गैरहजर", leave: "रजा",
+    summaryPresent: "हजर", summaryAbsent: "गैरहजर", summaryLeave: "रजा",
+    reportsTitle: "हजेरी अहवाल", reportsSub: "मासिक हजेरी कामगिरी पहा.",
+    attendanceRate: "हजेरी दर", workingDaysLabel: "कामाचे दिवस", totalRecordsLabel: "एकूण नोंदी", presentRecordsLabel: "हजर नोंदी",
+    allEmployees: "सर्व कर्मचारी", exportCSVBtn: "CSV निर्यात करा", printBtn: "प्रिंट करा", monthlyReportTitle: "मासिक कर्मचारी हजेरी",
+    reportTablePresent: "हजर", reportTableAbsent: "गैरहजर", reportTableLeave: "रजा", reportTablePercentage: "हजेरी %",
+    noReportData: "कोणताही अहवाल डेटा उपलब्ध नाही.",
+    idPrefix: "आयडी",
+    toastLoginSuccess: "लॉगिन यशस्वी!", toastInvalidLogin: "अवैध वापरकर्तानाव किंवा पासवर्ड!",
+    toastFieldsRequired: "कृपया सर्व रकाने भरा.", toastEmployeeUpdated: "कर्मचारी यशस्वीरित्या अद्ययावत झाला!",
+    toastEmployeeAdded: "कर्मचारी यशस्वीरित्या जोडला गेला!", toastEmployeeDeleted: "कर्मचारी यशस्वीरित्या काढला गेला!",
+    toastAllMarkedPresent: "सर्व कर्मचारी हजर म्हणून नोंदवले.", toastAttendanceSaved: "हजेरी यशस्वीरित्या जतन झाली!",
+    toastCSVExported: "CSV यशस्वीरित्या निर्यात झाली!", toastLoadError: "जतन केलेला डेटा लोड करता आला नाही. नव्याने सुरू करत आहोत.",
+    dateLocale: "mr-IN"
+  }
+};
+
+const DEPARTMENTS = ["Administration","Accounts","Development"];
+const deptKey = d => "dept" + d;
+
+let lang = "en";
+function t(key) { return (translations[lang] && translations[lang][key]) || translations.en[key] || key; }
+
+/* =========================================================
+   DEFAULT DATA
+========================================================= */
+const defaultEmployees = [
+  { id: 1, name: "Rahul Sharma", dept: "Administration", role: "Secretary", phone: "98765 43210" },
+  { id: 2, name: "Priya Patil", dept: "Accounts", role: "Account Assistant", phone: "98765 12345" },
+  { id: 3, name: "Amit Verma", dept: "Development", role: "Clerk", phone: "98670 11122" },
+  { id: 4, name: "Sneha Joshi", dept: "Administration", role: "Data Entry Operator", phone: "98900 22334" },
+  { id: 5, name: "Vikas Rao", dept: "Development", role: "Assistant", phone: "98220 33445" },
+  { id: 6, name: "Neha Deshmukh", dept: "Accounts", role: "Accountant", phone: "98123 44556" },
+  { id: 7, name: "Rohan Kale", dept: "Development", role: "Clerk", phone: "98001 55667" },
+  { id: 8, name: "Pooja Singh", dept: "Administration", role: "Assistant", phone: "97999 66778" }
+];
+
+let employees = [];
+let attendance = {};
+let deleteEmployeeId = null;
+let loggedIn = false;
+let storageAvailable = false;
+
+/* =========================================================
+   STORAGE (persistent, replaces localStorage which does not
+   work inside Claude.ai artifacts)
+   NOTE: employees & attendance are saved as SHARED data, so
+   every person who opens this artifact sees the same staff
+   list and attendance records. Language preference and login
+   state are saved per-person only.
+========================================================= */
+async function loadAll() {
+  try {
+    if (!window.storage) throw new Error("no storage");
+    storageAvailable = true;
+
+    const [empRes, attRes, langRes, sessionRes] = await Promise.allSettled([
+      window.storage.get("employees", true),
+      window.storage.get("attendance", true),
+      window.storage.get("language", false),
+      window.storage.get("session", false)
+    ]);
+
+    employees = (empRes.status === "fulfilled" && empRes.value) ? JSON.parse(empRes.value.value) : defaultEmployees;
+    attendance = (attRes.status === "fulfilled" && attRes.value) ? JSON.parse(attRes.value.value) : {};
+    lang = (langRes.status === "fulfilled" && langRes.value) ? langRes.value.value : "en";
+    loggedIn = (sessionRes.status === "fulfilled" && sessionRes.value) ? sessionRes.value.value === "true" : false;
+
+    if (empRes.status !== "fulfilled" || !empRes.value) {
+      await window.storage.set("employees", JSON.stringify(defaultEmployees), true);
+    }
+  } catch (e) {
+    storageAvailable = false;
+    employees = defaultEmployees;
+    attendance = {};
+    lang = "en";
+    loggedIn = false;
+  }
+}
+
+async function persistEmployees() {
+  if (!storageAvailable) return;
+  try { await window.storage.set("employees", JSON.stringify(employees), true); }
+  catch (e) { console.error("Storage error (employees):", e); }
+}
+
+async function persistAttendance() {
+  if (!storageAvailable) return;
+  try { await window.storage.set("attendance", JSON.stringify(attendance), true); }
+  catch (e) { console.error("Storage error (attendance):", e); }
+}
+
+async function persistLanguage() {
+  if (!storageAvailable) return;
+  try { await window.storage.set("language", lang, false); }
+  catch (e) { console.error("Storage error (language):", e); }
+}
+
+async function persistSession(value) {
+  if (!storageAvailable) return;
+  try { await window.storage.set("session", String(value), false); }
+  catch (e) { console.error("Storage error (session):", e); }
+}
+
+/* =========================================================
+   DATE
+========================================================= */
+function getToday() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+}
+function formatDate(date) {
+  return new Date(date + "T00:00:00").toLocaleDateString(t("dateLocale"), { day:"numeric", month:"long", year:"numeric" });
+}
+
+/* =========================================================
+   LANGUAGE
+========================================================= */
+function setLanguage(newLang) {
+  lang = newLang;
+  document.getElementById("langSwitcherLogin") && (document.getElementById("langSwitcherLogin").value = lang);
+  document.getElementById("langSwitcherSidebar") && (document.getElementById("langSwitcherSidebar").value = lang);
+  document.getElementById("langSwitcherMobile") && (document.getElementById("langSwitcherMobile").value = lang);
+  applyStaticTranslations();
+  populateDeptSelects();
+  updateDate();
+  if (!document.getElementById("app").classList.contains("hidden")) {
+    renderDashboard();
+    renderEmployees();
+    renderAttendance();
+    populateReportEmployees();
+    renderReports();
+    const activePage = document.querySelector(".navBtn.bg-green-50");
+    const titles = { dashboard:"navDashboard", employees:"navEmployees", attendance:"navAttendance", reports:"navReports" };
+    const activeId = activePage ? activePage.dataset.page : "dashboard";
+    document.getElementById("pageTitle").textContent = t(titles[activeId]);
+  }
+  persistLanguage();
+}
+
+function applyStaticTranslations() {
+  document.querySelectorAll("[data-i18n]").forEach(el => { el.textContent = t(el.dataset.i18n); });
+  document.querySelectorAll("[data-i18n-placeholder]").forEach(el => { el.placeholder = t(el.dataset.i18nPlaceholder); });
+}
+
+function populateDeptSelects() {
+  const optionsHTML = (includeAll, allLabel) => {
+    let html = includeAll ? `<option value="">${t(allLabel)}</option>` : `<option value="">${t("selectDepartment")}</option>`;
+    DEPARTMENTS.forEach(d => { html += `<option value="${d}">${t(deptKey(d))}</option>`; });
+    return html;
+  };
+  document.querySelectorAll(".deptSelect").forEach(sel => {
+    const current = sel.value;
+    sel.innerHTML = optionsHTML(true, "allDepartments");
+    sel.value = current;
+  });
+  document.querySelectorAll(".deptSelectForm").forEach(sel => {
+    const current = sel.value;
+    sel.innerHTML = optionsHTML(false);
+    sel.value = current;
+  });
+}
+
+function deptLabel(dept) { return t(deptKey(dept)); }
+function statusLabel(status) { return t(status.toLowerCase()); }
+
+/* =========================================================
+   LOGIN
+========================================================= */
+function login() {
+  const username = document.getElementById("username").value.trim();
+  const password = document.getElementById("password").value;
+
+  if (username === "admin" && password === "admin123") {
+    loggedIn = true;
+    persistSession(true);
+    document.getElementById("loginPage").classList.add("hidden");
+    document.getElementById("app").classList.remove("hidden");
+    init();
+    toast(t("toastLoginSuccess"));
+  } else {
+    toast(t("toastInvalidLogin"), "error");
+  }
+}
+
+function logout() {
+  loggedIn = false;
+  persistSession(false);
+  document.getElementById("app").classList.add("hidden");
+  document.getElementById("loginPage").classList.remove("hidden");
+}
+
+function togglePassword() {
+  const input = document.getElementById("password");
+  input.type = input.type === "password" ? "text" : "password";
+}
+
+/* =========================================================
+   INITIALIZE
+========================================================= */
+function init() {
+  document.getElementById("attDate").value = getToday();
+  document.getElementById("reportMonth").value = getToday().slice(0, 7);
+  applyStaticTranslations();
+  populateDeptSelects();
+  updateDate();
+  renderDashboard();
+  renderEmployees();
+  renderAttendance();
+  populateReportEmployees();
+  renderReports();
+}
+
+function updateDate() {
+  document.getElementById("currentDate").textContent =
+    new Date().toLocaleDateString(t("dateLocale"), { weekday:"long", day:"numeric", month:"long", year:"numeric" });
+}
+
+/* =========================================================
+   NAVIGATION
+========================================================= */
+function showPage(id) {
+  document.querySelectorAll(".page").forEach(page => page.classList.add("hidden"));
+  document.getElementById(id).classList.remove("hidden");
+
+  const titles = { dashboard:"navDashboard", employees:"navEmployees", attendance:"navAttendance", reports:"navReports" };
+  document.getElementById("pageTitle").textContent = t(titles[id]);
+
+  document.querySelectorAll(".navBtn").forEach(btn => {
+    btn.classList.remove("bg-green-50", "text-green-700");
+    if (btn.dataset.page === id) btn.classList.add("bg-green-50", "text-green-700");
+  });
+
+  if (id === "dashboard") renderDashboard();
+  if (id === "employees") renderEmployees();
+  if (id === "attendance") renderAttendance();
+  if (id === "reports") { populateReportEmployees(); renderReports(); }
+}
+
+function openMobileMenu() {
+  document.getElementById("mobileSidebar").classList.remove("-translate-x-full");
+  document.getElementById("mobileOverlay").classList.remove("hidden");
+}
+function closeMobileMenu() {
+  document.getElementById("mobileSidebar").classList.add("-translate-x-full");
+  document.getElementById("mobileOverlay").classList.add("hidden");
+}
+function mobileNavigate(id) { closeMobileMenu(); showPage(id); }
+
+/* =========================================================
+   ATTENDANCE HELPERS
+========================================================= */
+function attendanceKey(employeeId, date) { return `${date}_${employeeId}`; }
+function getStatus(employeeId, date) { return attendance[attendanceKey(employeeId, date)] || "Absent"; }
+
+function badge(status) {
+  const classes = { Present:"bg-green-100 text-green-700", Absent:"bg-red-100 text-red-700", Leave:"bg-amber-100 text-amber-700" };
+  return `<span class="inline-flex px-2.5 py-1 rounded-full text-xs font-bold ${classes[status]}">${statusLabel(status)}</span>`;
+}
+
+/* =========================================================
+   DASHBOARD
+========================================================= */
+function renderDashboard() {
+  const today = getToday();
+  const statuses = employees.map(e => getStatus(e.id, today));
+
+  document.getElementById("totalEmployees").textContent = employees.length;
+  document.getElementById("presentCount").textContent = statuses.filter(s => s === "Present").length;
+  document.getElementById("absentCount").textContent = statuses.filter(s => s === "Absent").length;
+  document.getElementById("leaveCount").textContent = statuses.filter(s => s === "Leave").length;
+
+  document.getElementById("dashTable").innerHTML = employees.map(e => {
+    const status = getStatus(e.id, today);
+    return `
+      <tr class="border-b last:border-0 hover:bg-slate-50">
+        <td class="p-4 font-semibold">${escapeHTML(e.name)}</td>
+        <td>${escapeHTML(deptLabel(e.dept))}</td>
+        <td>${escapeHTML(e.role)}</td>
+        <td>${badge(status)}</td>
+      </tr>`;
+  }).join("");
+}
+
+/* =========================================================
+   EMPLOYEE RENDER
+========================================================= */
+function renderEmployees() {
+  const search = document.getElementById("employeeSearch").value.toLowerCase().trim();
+  const department = document.getElementById("employeeDepartmentFilter").value;
+
+  const filtered = employees.filter(e => {
+    const matchesSearch = !search || e.name.toLowerCase().includes(search) || e.dept.toLowerCase().includes(search) || e.role.toLowerCase().includes(search);
+    const matchesDept = !department || e.dept === department;
+    return matchesSearch && matchesDept;
+  });
+
+  const table = document.getElementById("employeeTable");
+
+  if (!filtered.length) {
+    table.innerHTML = `<tr><td colspan="6" class="p-10 text-center text-slate-500">${t("noEmployeesFound")}</td></tr>`;
+    return;
+  }
+
+  table.innerHTML = filtered.map(e => {
+    const status = getStatus(e.id, getToday());
+    return `
+      <tr class="border-b last:border-0 hover:bg-slate-50">
+        <td class="p-4">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full bg-green-100 text-green-700 grid place-items-center font-bold">${escapeHTML(e.name.charAt(0))}</div>
+            <div>
+              <p class="font-bold">${escapeHTML(e.name)}</p>
+              <p class="text-xs text-slate-500">${t("idPrefix")}: GP-${String(e.id).padStart(3,"0")}</p>
+            </div>
+          </div>
+        </td>
+        <td>${escapeHTML(deptLabel(e.dept))}</td>
+        <td>${escapeHTML(e.role)}</td>
+        <td>${escapeHTML(e.phone)}</td>
+        <td>${badge(status)}</td>
+        <td class="pr-4">
+          <div class="flex gap-2">
+            <button onclick="editEmployee(${e.id})" class="px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 font-semibold">${t("editBtn")}</button>
+            <button onclick="openDeleteModal(${e.id})" class="px-3 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 font-semibold">${t("deleteBtn")}</button>
+          </div>
+        </td>
+      </tr>`;
+  }).join("");
+}
+
+/* =========================================================
+   EMPLOYEE MODAL
+========================================================= */
+function openEmployeeModal() {
+  document.getElementById("employeeModal").classList.remove("hidden");
+  document.getElementById("employeeModal").classList.add("flex");
+  document.getElementById("modalTitle").textContent = t("modalAddTitle");
+  document.getElementById("employeeId").value = "";
+  document.getElementById("employeeName").value = "";
+  document.getElementById("employeeDept").value = "";
+  document.getElementById("employeeRole").value = "";
+  document.getElementById("employeePhone").value = "";
+}
+function closeEmployeeModal() {
+  document.getElementById("employeeModal").classList.add("hidden");
+  document.getElementById("employeeModal").classList.remove("flex");
+}
+function editEmployee(id) {
+  const employee = employees.find(e => e.id === id);
+  if (!employee) return;
+  document.getElementById("employeeModal").classList.remove("hidden");
+  document.getElementById("employeeModal").classList.add("flex");
+  document.getElementById("modalTitle").textContent = t("modalEditTitle");
+  document.getElementById("employeeId").value = employee.id;
+  document.getElementById("employeeName").value = employee.name;
+  document.getElementById("employeeDept").value = employee.dept;
+  document.getElementById("employeeRole").value = employee.role;
+  document.getElementById("employeePhone").value = employee.phone;
+}
+
+function saveEmployee() {
+  const id = document.getElementById("employeeId").value;
+  const name = document.getElementById("employeeName").value.trim();
+  const dept = document.getElementById("employeeDept").value;
+  const role = document.getElementById("employeeRole").value.trim();
+  const phone = document.getElementById("employeePhone").value.trim();
+
+  if (!name || !dept || !role || !phone) { toast(t("toastFieldsRequired"), "error"); return; }
+
+  if (id) {
+    const employee = employees.find(e => e.id === Number(id));
+    if (employee) { employee.name = name; employee.dept = dept; employee.role = role; employee.phone = phone; }
+    toast(t("toastEmployeeUpdated"));
+  } else {
+    employees.push({ id: Date.now(), name, dept, role, phone });
+    toast(t("toastEmployeeAdded"));
+  }
+
+  persistEmployees();
+  closeEmployeeModal();
+  renderEmployees();
+  renderDashboard();
+  populateReportEmployees();
+}
+
+/* =========================================================
+   DELETE
+========================================================= */
+function openDeleteModal(id) {
+  deleteEmployeeId = id;
+  document.getElementById("deleteModal").classList.remove("hidden");
+  document.getElementById("deleteModal").classList.add("flex");
+}
+function closeDeleteModal() {
+  deleteEmployeeId = null;
+  document.getElementById("deleteModal").classList.add("hidden");
+  document.getElementById("deleteModal").classList.remove("flex");
+}
+function confirmDelete() {
+  if (!deleteEmployeeId) return;
+  employees = employees.filter(e => e.id !== deleteEmployeeId);
+  Object.keys(attendance).forEach(key => { if (key.endsWith("_" + deleteEmployeeId)) delete attendance[key]; });
+
+  persistEmployees();
+  persistAttendance();
+  closeDeleteModal();
+  renderEmployees();
+  renderDashboard();
+  renderAttendance();
+  populateReportEmployees();
+  renderReports();
+  toast(t("toastEmployeeDeleted"));
+}
+
+/* =========================================================
+   ATTENDANCE
+========================================================= */
+function renderAttendance() {
+  const date = document.getElementById("attDate").value || getToday();
+  const department = document.getElementById("attendanceDepartment").value;
+  const filtered = employees.filter(e => !department || e.dept === department);
+  const table = document.getElementById("attendanceTable");
+
+  if (!filtered.length) {
+    table.innerHTML = `<tr><td colspan="4" class="p-10 text-center text-slate-500">${t("noEmployeesFound")}</td></tr>`;
+    return;
+  }
+
+  table.innerHTML = filtered.map(e => {
+    const status = getStatus(e.id, date);
+    return `
+      <tr class="border-b last:border-0 hover:bg-slate-50">
+        <td class="p-4">
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-full bg-green-100 text-green-700 grid place-items-center font-bold">${escapeHTML(e.name.charAt(0))}</div>
+            <span class="font-semibold">${escapeHTML(e.name)}</span>
+          </div>
+        </td>
+        <td>${escapeHTML(deptLabel(e.dept))}</td>
+        <td>${escapeHTML(e.role)}</td>
+        <td>
+          <div class="flex flex-wrap gap-2">
+            <label class="cursor-pointer">
+              <input type="radio" name="status_${e.id}" value="Present" class="peer hidden" ${status==="Present"?"checked":""} onchange="temporaryStatus(${e.id}, 'Present')">
+              <span class="inline-block px-3 py-2 rounded-lg border text-green-700 peer-checked:bg-green-600 peer-checked:text-white peer-checked:border-green-600">✓ ${t("present")}</span>
+            </label>
+            <label class="cursor-pointer">
+              <input type="radio" name="status_${e.id}" value="Absent" class="peer hidden" ${status==="Absent"?"checked":""} onchange="temporaryStatus(${e.id}, 'Absent')">
+              <span class="inline-block px-3 py-2 rounded-lg border text-red-600 peer-checked:bg-red-600 peer-checked:text-white peer-checked:border-red-600">✕ ${t("absent")}</span>
+            </label>
+            <label class="cursor-pointer">
+              <input type="radio" name="status_${e.id}" value="Leave" class="peer hidden" ${status==="Leave"?"checked":""} onchange="temporaryStatus(${e.id}, 'Leave')">
+              <span class="inline-block px-3 py-2 rounded-lg border text-amber-600 peer-checked:bg-amber-500 peer-checked:text-white peer-checked:border-amber-500">🗓 ${t("leave")}</span>
+            </label>
+          </div>
+        </td>
+      </tr>`;
+  }).join("");
+
+  updateAttendanceSummary();
+}
+
+function temporaryStatus(employeeId, status) {
+  const date = document.getElementById("attDate").value;
+  attendance[attendanceKey(employeeId, date)] = status;
+  updateAttendanceSummary();
+}
+
+function updateAttendanceSummary() {
+  const date = document.getElementById("attDate").value;
+  const statuses = employees.map(e => getStatus(e.id, date));
+  const present = statuses.filter(s => s === "Present").length;
+  const absent = statuses.filter(s => s === "Absent").length;
+  const leave = statuses.filter(s => s === "Leave").length;
+
+  document.getElementById("attendanceSummary").innerHTML = `
+    <span class="font-semibold text-green-700">${t("summaryPresent")}: ${present}</span>
+    <span class="mx-2">•</span>
+    <span class="font-semibold text-red-600">${t("summaryAbsent")}: ${absent}</span>
+    <span class="mx-2">•</span>
+    <span class="font-semibold text-amber-600">${t("summaryLeave")}: ${leave}</span>
+  `;
+}
+
+function markAllPresent() {
+  const date = document.getElementById("attDate").value;
+  employees.forEach(e => { attendance[attendanceKey(e.id, date)] = "Present"; });
+  renderAttendance();
+  toast(t("toastAllMarkedPresent"));
+}
+
+function saveAttendance() {
+  persistAttendance();
+  renderDashboard();
+  renderReports();
+  toast(t("toastAttendanceSaved"));
+}
+
+/* =========================================================
+   REPORT EMPLOYEE DROPDOWN
+========================================================= */
+function populateReportEmployees() {
+  const select = document.getElementById("reportEmployee");
+  const current = select.value;
+  select.innerHTML = `<option value="">${t("allEmployees")}</option>`;
+  employees.forEach(e => {
+    const option = document.createElement("option");
+    option.value = e.id;
+    option.textContent = e.name;
+    select.appendChild(option);
+  });
+  select.value = current;
+}
+
+/* =========================================================
+   REPORTS
+========================================================= */
+function renderReports() {
+  const month = document.getElementById("reportMonth").value || getToday().slice(0,7);
+  const employeeFilter = document.getElementById("reportEmployee").value;
+  const [year, mon] = month.split("-").map(Number);
+  const daysInMonth = new Date(year, mon, 0).getDate();
+
+  let selectedEmployees = employees;
+  if (employeeFilter) selectedEmployees = employees.filter(e => e.id === Number(employeeFilter));
+
+  let totalRecords = 0, totalPresent = 0, totalAbsent = 0, totalLeave = 0;
+
+  const rows = selectedEmployees.map(e => {
+    let present = 0, absent = 0, leave = 0;
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = `${year}-${String(mon).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
+      const key = attendanceKey(e.id, date);
+      const status = getStatus(e.id, date);
+
+      if (attendance[key]) {
+        totalRecords++;
+        if (status === "Present") { present++; totalPresent++; }
+        if (status === "Absent") { absent++; totalAbsent++; }
+        if (status === "Leave") { leave++; totalLeave++; }
+      }
+    }
+
+    const total = present + absent + leave;
+    const percentage = total ? Math.round((present / total) * 100) : 0;
+
+    return `
+      <tr class="border-b last:border-0 hover:bg-slate-50">
+        <td class="p-4 font-bold">${escapeHTML(e.name)}</td>
+        <td>${escapeHTML(deptLabel(e.dept))}</td>
+        <td class="text-green-700 font-bold">${present}</td>
+        <td class="text-red-600 font-bold">${absent}</td>
+        <td class="text-amber-600 font-bold">${leave}</td>
+        <td><span class="inline-flex px-3 py-1 rounded-full text-xs font-bold ${percentage>=75 ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}">${percentage}%</span></td>
+      </tr>`;
+  }).join("");
+
+  document.getElementById("reportTable").innerHTML = rows || `<tr><td colspan="6" class="p-10 text-center text-slate-500">${t("noReportData")}</td></tr>`;
+
+  const rate = totalRecords ? Math.round((totalPresent / totalRecords) * 100) : 0;
+  const uniqueDates = new Set();
+  Object.keys(attendance).forEach(key => { const date = key.split("_")[0]; if (date.startsWith(month)) uniqueDates.add(date); });
+
+  document.getElementById("reportRate").textContent = rate + "%";
+  document.getElementById("workingDays").textContent = uniqueDates.size;
+  document.getElementById("recordCount").textContent = totalRecords;
+  document.getElementById("reportPresent").textContent = totalPresent;
+  document.getElementById("reportSubtitle").textContent = new Date(year, mon - 1).toLocaleDateString(t("dateLocale"), { month:"long", year:"numeric" });
+}
+
+/* =========================================================
+   CSV EXPORT
+========================================================= */
+function exportCSV() {
+  const month = document.getElementById("reportMonth").value || getToday().slice(0,7);
+  const [year, mon] = month.split("-").map(Number);
+  const daysInMonth = new Date(year, mon, 0).getDate();
+
+  let csv = "Employee,Department,Date,Status\n";
+  employees.forEach(e => {
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = `${year}-${String(mon).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
+      const key = attendanceKey(e.id, date);
+      if (attendance[key]) csv += `"${e.name}","${e.dept}","${date}","${attendance[key]}"\n`;
+    }
+  });
+
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `attendance-${month}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast(t("toastCSVExported"));
+}
+
+/* =========================================================
+   TOAST
+========================================================= */
+function toast(message, type = "success") {
+  const box = document.getElementById("toastContent");
+  box.textContent = message;
+  box.className = type === "error"
+    ? "bg-red-600 text-white px-5 py-3 rounded-xl shadow-xl text-sm font-semibold"
+    : "bg-slate-900 text-white px-5 py-3 rounded-xl shadow-xl text-sm font-semibold";
+
+  const toastBox = document.getElementById("toast");
+  toastBox.classList.remove("translate-y-20", "opacity-0");
+  setTimeout(() => { toastBox.classList.add("translate-y-20", "opacity-0"); }, 2500);
+}
+
+/* =========================================================
+   ESCAPE HTML
+========================================================= */
+function escapeHTML(value) {
+  return String(value).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;");
+}
+
+/* =========================================================
+   START
+========================================================= */
+async function start() {
+  await loadAll();
+
+  document.getElementById("langSwitcherLogin").value = lang;
+  document.getElementById("langSwitcherSidebar").value = lang;
+  document.getElementById("langSwitcherMobile").value = lang;
+  applyStaticTranslations();
+  populateDeptSelects();
+
+  document.getElementById("loadingScreen").style.opacity = "0";
+  setTimeout(() => { document.getElementById("loadingScreen").classList.add("hidden"); }, 300);
+
+  if (loggedIn) {
+    document.getElementById("app").classList.remove("hidden");
+    init();
+  } else {
+    document.getElementById("loginPage").classList.remove("hidden");
+  }
+}
+
+document.addEventListener("DOMContentLoaded", start);
+</script>
+
+</body>
+</html>
