@@ -87,7 +87,7 @@ body{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,
             <option value="en">English</option><option value="hi">हिंदी</option><option value="mr">मराठी</option>
           </select>
           <button onclick="toggleDark()" class="w-10 h-10 rounded-xl border border-slate-200 dark:border-slate-700 grid place-items-center" title="Theme"><i data-lucide="moon"></i></button>
-          <button onclick="openAdminLogin()" class="hidden sm:flex items-center gap-2 bg-brand-700 hover:bg-brand-800 text-white px-4 py-2.5 rounded-xl font-bold text-sm"><i data-lucide="shield-check" size="17"></i> Admin</button>
+          <button onclick="requestLocationAndOpenAdmin()" class="hidden sm:flex items-center gap-2 bg-brand-700 hover:bg-brand-800 text-white px-4 py-2.5 rounded-xl font-bold text-sm"><i data-lucide="shield-check" size="17"></i> Admin</button>
           <button onclick="togglePublicMenu()" class="lg:hidden w-10 h-10 rounded-xl border border-slate-200 dark:border-slate-700 grid place-items-center"><i data-lucide="menu"></i></button>
         </div>
       </div>
@@ -171,6 +171,9 @@ body{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,
     <div class="gradient-hero p-7 text-white">
       <div class="w-14 h-14 rounded-2xl bg-white/15 grid place-items-center mb-5"><i data-lucide="shield-check" size="28"></i></div>
       <h2 class="text-2xl font-black">Secure Admin Login</h2><p class="text-white/75 text-sm mt-1">Gram Panchayat Management Portal</p>
+      <div id="loginLocationStatus" class="mt-4 text-xs bg-white/10 border border-white/20 rounded-xl px-3 py-2">
+        Location verification required
+      </div>
     </div>
     <form onsubmit="login(event)" class="p-7 space-y-5">
       <div><label class="label">Username</label><input id="loginUser" class="input" value="admin" autocomplete="username"></div>
@@ -241,7 +244,7 @@ const defaultData={
 let data=loadData();
 let lang=localStorage.getItem('gp_lang')||'en';
 let dark=localStorage.getItem('gp_dark')==='1';
-let adminLogged=localStorage.getItem('gp_admin')==='1';
+let adminLogged=sessionStorage.getItem('gp_admin')==='1';
 let currentAdminPage='dashboard';
 let currentPublicPage='home';
 let charts={};
@@ -309,14 +312,154 @@ function publicDocumentsHTML(){return `<section class="max-w-6xl mx-auto px-4 py
 function publicGalleryHTML(){return `<section class="max-w-7xl mx-auto px-4 py-16"><div class="text-xs uppercase tracking-widest font-black text-brand-700">Village Life</div><h1 class="text-4xl font-black mt-3">Photo Gallery</h1><div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 mt-10">${data.gallery.map(g=>`<figure class="group rounded-3xl overflow-hidden bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800"><img src="${esc(g.image)}" class="w-full aspect-[4/3] object-cover group-hover:scale-105 transition duration-500" alt="${esc(g.title)}"><figcaption class="p-4 font-bold">${esc(g.title)}</figcaption></figure>`).join('')}</div></section>`}
 function publicContactHTML(){return `<section class="max-w-7xl mx-auto px-4 py-16"><div class="grid lg:grid-cols-2 gap-10"><div><div class="text-xs uppercase tracking-widest font-black text-brand-700">${T('contact')}</div><h1 class="text-4xl font-black mt-3">We are here to serve.</h1><p class="text-slate-500 mt-5 leading-7">For applications, certificates, schemes and local governance queries, visit the Panchayat office during working hours.</p><div class="space-y-4 mt-8">${[['map-pin','Office Address','Gram Panchayat Office, Taluka, District, Maharashtra'],['phone','Phone','0712-0000000'],['mail','Email','panchayat@example.gov.in'],['clock','Office Hours','Monday to Saturday • 10:00 AM – 5:30 PM']].map(x=>`<div class="flex gap-4 p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800"><div class="w-11 h-11 rounded-xl bg-brand-50 dark:bg-brand-900/20 text-brand-700 grid place-items-center"><i data-lucide="${x[0]}"></i></div><div><div class="text-xs text-slate-400">${x[1]}</div><div class="font-bold mt-1">${x[2]}</div></div></div>`).join('')}</div></div><div class="rounded-3xl bg-slate-100 dark:bg-slate-900 min-h-[450px] grid place-items-center text-center p-10"><div><i data-lucide="map" size="52" class="mx-auto text-brand-700"></i><h3 class="text-2xl font-black mt-5">Office Location</h3><p class="text-slate-500 mt-2">Replace this area with the official Google Maps embed for your Gram Panchayat.</p></div></div></div></section>`}
 
+
+/* =========================================================
+   YERLA LOCATION / GEOFENCE SECURITY
+   IMPORTANT:
+   Exact Gram Panchayat Office Yerla geofence.
+   Address: Yerla, Nagpur, SH-248, Nagpur Katol Road,
+   Nagpur, Maharashtra 441501.
+   Admin login and attendance are allowed only near this point.
+========================================================= */
+const YERLA_GEOFENCE = {
+  name: 'Gram Panchayat Office Yerla',
+  latitude: 21.2090128,
+  longitude: 78.9609805,
+  radiusMeters: 150,        // only within 150 m of Gram Panchayat Office Yerla
+  maxAccuracyMeters: 250    // reject very inaccurate fixes
+};
+
+let verifiedLocation = null;
+let locationVerifiedThisSession = false;
+
+function distanceMeters(lat1, lon1, lat2, lon2){
+  const R = 6371000;
+  const toRad = d => d * Math.PI / 180;
+  const dLat = toRad(lat2-lat1);
+  const dLon = toRad(lon2-lon1);
+  const a = Math.sin(dLat/2)**2 +
+            Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*
+            Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function getCurrentPositionSecure(){
+  return new Promise((resolve,reject)=>{
+    if(!navigator.geolocation){
+      reject(new Error('Geolocation is not supported on this device/browser.'));
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      resolve,
+      err => {
+        let msg='Unable to get your location.';
+        if(err.code===1) msg='Location permission denied. Please allow location access.';
+        if(err.code===2) msg='Location is unavailable. Turn on GPS/location services.';
+        if(err.code===3) msg='Location request timed out. Please try again.';
+        reject(new Error(msg));
+      },
+      {enableHighAccuracy:true, timeout:15000, maximumAge:0}
+    );
+  });
+}
+
+async function verifyYerlaLocation(showSuccess=true){
+  const pos = await getCurrentPositionSecure();
+  const {latitude,longitude,accuracy} = pos.coords;
+  const distance = distanceMeters(
+    latitude, longitude,
+    YERLA_GEOFENCE.latitude, YERLA_GEOFENCE.longitude
+  );
+
+  verifiedLocation = {
+    latitude,
+    longitude,
+    accuracy: Math.round(accuracy || 0),
+    distance: Math.round(distance),
+    checkedAt: new Date().toISOString()
+  };
+
+  if(accuracy && accuracy > YERLA_GEOFENCE.maxAccuracyMeters){
+    locationVerifiedThisSession=false;
+    throw new Error(`GPS accuracy is too low (${Math.round(accuracy)} m). Move outdoors/near a window and try again.`);
+  }
+
+  if(distance > YERLA_GEOFENCE.radiusMeters){
+    locationVerifiedThisSession=false;
+    throw new Error(`Access blocked. You are about ${(distance/1000).toFixed(2)} km from the allowed Yerla location.`);
+  }
+
+  locationVerifiedThisSession=true;
+  sessionStorage.setItem('gp_location_verified','1');
+  sessionStorage.setItem('gp_location_data',JSON.stringify(verifiedLocation));
+
+  if(showSuccess) toast(`Location verified • ${Math.round(distance)} m from Yerla`);
+  return verifiedLocation;
+}
+
+async function requestLocationAndOpenAdmin(){
+  toast('Checking your location...');
+  try{
+    const loc=await verifyYerlaLocation(false);
+    openAdminLogin();
+    const box=document.getElementById('loginLocationStatus');
+    if(box){
+      box.innerHTML=`✓ Location verified<br><b>${loc.distance} m</b> from allowed Yerla zone • GPS accuracy ${loc.accuracy} m`;
+      box.className='mt-4 text-xs bg-emerald-500/20 border border-emerald-200/30 rounded-xl px-3 py-2';
+    }
+    toast('Yerla location verified');
+  }catch(err){
+    closeLogin();
+    toast(err.message,'error');
+    alert('Admin access blocked\\n\\n'+err.message+'\\n\\nPlease enable Location/GPS and try again from Yerla.');
+  }
+}
+
+async function requireYerlaLocation(actionName='this action'){
+  if(!locationVerifiedThisSession){
+    try{
+      await verifyYerlaLocation(false);
+    }catch(err){
+      toast(`${actionName} blocked: ${err.message}`,'error');
+      alert(`${actionName} blocked\\n\\n${err.message}`);
+      return false;
+    }
+  }
+
+  // Re-check every sensitive action so moving away cannot keep attendance access.
+  try{
+    await verifyYerlaLocation(false);
+    return true;
+  }catch(err){
+    toast(`${actionName} blocked: ${err.message}`,'error');
+    return false;
+  }
+}
+
 /* =========================================================
    ADMIN LOGIN
 ========================================================= */
 function openAdminLogin(){const m=document.getElementById('loginModal');m.classList.remove('hidden');m.classList.add('flex')}
 function closeLogin(){const m=document.getElementById('loginModal');m.classList.add('hidden');m.classList.remove('flex')}
 function togglePass(){const x=document.getElementById('loginPass');x.type=x.type==='password'?'text':'password'}
-function login(e){e.preventDefault();if(document.getElementById('loginUser').value==='admin'&&document.getElementById('loginPass').value==='admin123'){adminLogged=true;localStorage.setItem('gp_admin','1');closeLogin();document.getElementById('publicSite').classList.add('hidden');document.getElementById('adminApp').classList.remove('hidden');adminPage('dashboard');toast('Login successful')}else toast('Invalid username or password','error')}
-function logout(){adminLogged=false;localStorage.removeItem('gp_admin');publicSite();toast('Logged out')}
+async function login(e){
+  e.preventDefault();
+  if(!locationVerifiedThisSession){
+    toast('Location verification required','error');
+    try{await verifyYerlaLocation(false)}catch(err){toast(err.message,'error');return}
+  }
+  if(document.getElementById('loginUser').value==='admin'&&document.getElementById('loginPass').value==='admin123'){
+    adminLogged=true;
+    sessionStorage.setItem('gp_admin','1');
+    closeLogin();
+    document.getElementById('publicSite').classList.add('hidden');
+    document.getElementById('adminApp').classList.remove('hidden');
+    adminPage('dashboard');
+    audit(`Admin login from Yerla geofence (${verifiedLocation?.distance ?? '?'} m)`);
+    toast('Login successful • Location verified');
+  }else toast('Invalid username or password','error')
+}
+function logout(){adminLogged=false;locationVerifiedThisSession=false;sessionStorage.removeItem('gp_admin');sessionStorage.removeItem('gp_location_verified');sessionStorage.removeItem('gp_location_data');publicSite();toast('Logged out')}
 function openSidebar(){document.getElementById('sidebar').classList.remove('-translate-x-full');document.getElementById('mobileOverlay').classList.remove('hidden')}
 function closeSidebar(){document.getElementById('sidebar').classList.add('-translate-x-full');document.getElementById('mobileOverlay').classList.add('hidden')}
 
@@ -324,7 +467,12 @@ function closeSidebar(){document.getElementById('sidebar').classList.add('-trans
    ADMIN NAV
 ========================================================= */
 const pageTitles={dashboard:'Dashboard',employees:'Employee Management',attendance:'Attendance Management',leave:'Leave Management',holidays:'Holiday Calendar',notices:'Notice Management',schemes:'Government Schemes',works:'Development Works',documents:'Documents & Forms',gallery:'Photo Gallery',reports:'Attendance Reports',audit:'Activity Log'};
-function adminPage(p){currentAdminPage=p;closeSidebar();document.getElementById('adminTitle').textContent=pageTitles[p]||'Dashboard';document.getElementById('adminDate').textContent=new Date().toLocaleDateString(lang==='mr'?'mr-IN':lang==='hi'?'hi-IN':'en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});document.querySelectorAll('.navbtn').forEach(b=>b.classList.toggle('nav-active',b.dataset.page===p));const fn={dashboard:adminDashboard,employees:adminEmployees,attendance:adminAttendance,leave:adminLeave,holidays:adminHolidays,notices:adminNotices,schemes:adminSchemes,works:adminWorks,documents:adminDocuments,gallery:adminGallery,reports:adminReports,audit:adminAudit}[p];document.getElementById('adminContent').innerHTML=fn();lucide.createIcons();afterAdminRender(p)}
+async function adminPage(p){
+if(p==='attendance'){
+  const ok=await requireYerlaLocation('Attendance');
+  if(!ok){return;}
+}
+currentAdminPage=p;closeSidebar();document.getElementById('adminTitle').textContent=pageTitles[p]||'Dashboard';document.getElementById('adminDate').textContent=new Date().toLocaleDateString(lang==='mr'?'mr-IN':lang==='hi'?'hi-IN':'en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});document.querySelectorAll('.navbtn').forEach(b=>b.classList.toggle('nav-active',b.dataset.page===p));const fn={dashboard:adminDashboard,employees:adminEmployees,attendance:adminAttendance,leave:adminLeave,holidays:adminHolidays,notices:adminNotices,schemes:adminSchemes,works:adminWorks,documents:adminDocuments,gallery:adminGallery,reports:adminReports,audit:adminAudit}[p];document.getElementById('adminContent').innerHTML=fn();lucide.createIcons();afterAdminRender(p)}
 function afterAdminRender(p){if(p==='dashboard')drawDashboardCharts();if(p==='reports')drawReportChart();updateBadge()}
 function updateBadge(){const n=data.leaves.filter(x=>x.status==='Pending').length;const b=document.getElementById('leaveBadge');b.textContent=n;b.classList.toggle('hidden',!n)}
 
@@ -369,9 +517,15 @@ function adminAttendance(){
  <div class="grid sm:grid-cols-3 gap-4 mb-5"><div class="mini"><span>Present</span><b id="sumP">0</b></div><div class="mini"><span>Absent</span><b id="sumA">0</b></div><div class="mini"><span>Leave</span><b id="sumL">0</b></div></div>
  <div class="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 overflow-hidden">${tableWrap('<th class="th">Employee</th><th class="th">Department</th><th class="th">Status</th>',data.employees.map(e=>`<tr class="border-t border-slate-100 dark:border-slate-800"><td class="td font-bold">${esc(e.name)}</td><td class="td">${esc(e.dept)}</td><td class="td"><div class="flex gap-2" data-emp="${e.id}">${['Present','Absent','Leave'].map(s=>`<button onclick="setAtt(${e.id},'${s}')" class="statusbtn ${getStatus(d,e.id)===s?'selected '+s.toLowerCase():''}">${s}</button>`).join('')}</div></td></tr>`).join(''))}</div></div>`;
 }
-function setAtt(id,status){const d=document.getElementById('attDate').value;if(!data.attendance[d])data.attendance[d]={};data.attendance[d][id]=status;adminPage('attendance')}
-function markAllPresent(){const d=document.getElementById('attDate').value;data.attendance[d]={};data.employees.forEach(e=>data.attendance[d][e.id]='Present');save();adminPage('attendance');toast('All employees marked Present')}
-function saveAttendance(){save();audit('Saved attendance for '+document.getElementById('attDate').value);toast('Attendance saved')}
+async function setAtt(id,status){if(!(await requireYerlaLocation('Attendance marking')))return;const d=document.getElementById('attDate').value;if(!data.attendance[d])data.attendance[d]={};data.attendance[d][id]=status;adminPage('attendance')}
+async function markAllPresent(){if(!(await requireYerlaLocation('Mark all present')))return;const d=document.getElementById('attDate').value;data.attendance[d]={};data.employees.forEach(e=>data.attendance[d][e.id]='Present');save();adminPage('attendance');toast('All employees marked Present')}
+async function saveAttendance(){
+if(!(await requireYerlaLocation('Save attendance')))return;
+save();
+const d=document.getElementById('attDate').value;
+audit(`Saved attendance for ${d} from Yerla geofence • distance ${verifiedLocation?.distance ?? '?'} m • accuracy ${verifiedLocation?.accuracy ?? '?'} m`);
+toast('Attendance saved • Location verified')
+}
 function updateAttendanceSummary(){}
 
 function adminLeave(){
@@ -446,8 +600,27 @@ document.head.appendChild(style);
 
 /* START */
 document.getElementById('publicLang').value=lang;
-if(adminLogged){document.getElementById('publicSite').classList.add('hidden');document.getElementById('adminApp').classList.remove('hidden');adminPage('dashboard')}else renderPublic();
-lucide.createIcons();
+locationVerifiedThisSession=sessionStorage.getItem('gp_location_verified')==='1';
+try{verifiedLocation=JSON.parse(sessionStorage.getItem('gp_location_data')||'null')}catch(e){verifiedLocation=null}
+
+async function bootPortal(){
+  if(adminLogged){
+    try{
+      await verifyYerlaLocation(false);
+      document.getElementById('publicSite').classList.add('hidden');
+      document.getElementById('adminApp').classList.remove('hidden');
+      await adminPage('dashboard');
+    }catch(err){
+      adminLogged=false;
+      sessionStorage.removeItem('gp_admin');
+      sessionStorage.removeItem('gp_location_verified');
+      renderPublic();
+      toast('Admin session locked: Yerla location verification required','error');
+    }
+  }else renderPublic();
+  lucide.createIcons();
+}
+bootPortal();
 </script>
 </body>
 </html>
